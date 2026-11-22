@@ -1,8 +1,8 @@
 import {readdirSync,readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 
 // Metadata is indexed by the opcode byte, including when a jump enters an immediate.
-const meta=Array(256).fill(null);
-function def(op,imm,pop,push){meta[op]=[imm,pop,push];}
+const meta=new Uint16Array(256);
+function def(op,imm,pop,push){meta[op]=128|imm|pop<<3|push<<5;}
 def(0,0,0,0);def(1,1,0,1);def(2,4,0,1);
 def(3,0,1,0);def(4,0,1,2);def(5,0,2,2);def(6,0,2,3);def(7,0,3,3);
 for(const op of [16,17,18,19,20,21,22,24,25,26,28,29,30,32,33,34])def(op,0,2,1);
@@ -17,8 +17,8 @@ function run(p,input){
   execution:for(let step=0;step<1000000;step++){
     if(pc<0||pc>=p.length){code=9;break;}
     const op=p[pc],m=meta[op];
-    if(m===null){code=5;break;}
-    const [imm,pop,push]=m;
+    if(m===0){code=5;break;}
+    const imm=m&7,pop=m>>3&3,push=m>>5&3;
     if(pc+imm>=p.length){code=9;break;}
     if(sp<pop){code=2;break;}
     if(sp-pop+push>256){code=3;break;}
@@ -76,7 +76,8 @@ function run(p,input){
       case 80:{
         const text=String(b);
         if(len+text.length>65536){code=11;break execution;}
-        len+=out.write(text,len,'ascii');sp--;break;
+        for(let i=0;i<text.length;i++)out[len++]=text.charCodeAt(i);
+        sp--;break;
       }
       case 81:
         if(len===65536){code=11;break execution;}
